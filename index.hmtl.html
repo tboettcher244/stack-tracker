@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stack Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0c0f; --surface: #111418; --surface2: #181c22; --border: #1e242c;
+    --accent: #7ee8a2; --accent2: #5bc4f5; --accent3: #e8a27e;
+    --text: #e8eaed; --muted: #6b7280; --danger: #f87171; --warn: #fbbf24;
+    --glow: #c084fc;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; min-height: 100vh; padding: 0 0 80px; }
+  header { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+  .week-badge { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); background: var(--surface2); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); }
+  nav { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  .tab { flex: 1; min-width: 80px; padding: 14px 8px; text-align: center; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; letter-spacing: 0.03em; background: none; border-left: none; border-right: none; border-top: none; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+  .page { display: none; padding: 20px; }
+  .page.active { display: block; }
+
+  /* DASHBOARD */
+  .next-card { background: linear-gradient(135deg, #0f1f15 0%, #0d1a1f 100%); border: 1px solid #1a3025; border-radius: 16px; padding: 24px; margin-bottom: 20px; position: relative; overflow: hidden; }
+  .next-card::before { content: ''; position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(126,232,162,0.08) 0%, transparent 70%); border-radius: 50%; }
+  .next-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; }
+  .next-peptide { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .next-detail { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .next-detail span { color: var(--accent2); font-family: 'DM Mono', monospace; }
+  .log-btn { background: var(--accent); color: #0a0c0f; border: none; border-radius: 10px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; font-family: 'DM Sans', sans-serif; }
+  .log-btn:hover { opacity: 0.85; }
+  .section-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px; }
+  .peptide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .peptide-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .peptide-card.glow-card { border-color: rgba(192,132,252,0.25); background: linear-gradient(135deg, #111418 0%, #130f1a 100%); }
+  .peptide-card .p-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .peptide-card .p-dose { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .p-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
+  .p-status.due { background: rgba(126,232,162,0.12); color: var(--accent); }
+  .p-status.ok { background: rgba(91,196,245,0.1); color: var(--accent2); }
+  .p-status.soon { background: rgba(251,191,36,0.1); color: var(--warn); }
+  .p-status.glow { background: rgba(192,132,252,0.12); color: var(--glow); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+  .stat-lbl { font-size: 11px; color: var(--muted); }
+  .glow-sublabel { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--glow); opacity: 0.7; margin-top: 6px; letter-spacing: 0.05em; }
+
+  /* CALCULATOR */
+  .calc-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .calc-section.glow-section { border-color: rgba(192,132,252,0.2); }
+  .calc-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .pill { font-family: 'DM Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 400; }
+  .pill.tirz { background: rgba(232,162,126,0.15); color: var(--accent3); }
+  .pill.glow { background: rgba(192,132,252,0.12); color: var(--glow); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input, .field select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select option { background: var(--surface2); }
+  .calc-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px; }
+  .result-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .result-row:last-child { border-bottom: none; margin-bottom: 0; }
+  .result-row span:last-child { font-family: 'DM Mono', monospace; color: var(--text); font-size: 13px; }
+  .result-highlight span:last-child { color: var(--accent); font-size: 15px; }
+  .glow-breakdown { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .glow-breakdown-label { font-size: 11px; color: var(--glow); font-family: 'DM Mono', monospace; margin-bottom: 6px; letter-spacing: 0.05em; }
+  .glow-breakdown .result-row span:last-child { color: var(--glow); font-size: 12px; }
+
+  /* LOG */
+  .log-form { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .log-form h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+  .full-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .full-field label { font-size: 12px; color: var(--muted); }
+  .full-field input, .full-field select, .full-field textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .full-field input:focus, .full-field select:focus, .full-field textarea:focus { border-color: var(--accent); }
+  .full-field textarea { resize: vertical; min-height: 70px; }
+  .rating-row { display: flex; gap: 8px; }
+  .rating-btn { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 13px; padding: 10px 4px; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; text-align: center; }
+  .rating-btn.selected { background: rgba(126,232,162,0.12); border-color: var(--accent); color: var(--accent); }
+  .submit-btn { width: 100%; background: var(--accent); color: #0a0c0f; border: none; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; font-family: 'DM Sans', sans-serif; margin-top: 4px; }
+  .submit-btn:hover { opacity: 0.85; }
+
+  /* HISTORY */
+  .log-entry { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 10px; }
+  .entry-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .entry-peptide { font-size: 14px; font-weight: 600; }
+  .entry-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+  .entry-dose { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent2); margin-bottom: 6px; }
+  .entry-note { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .entry-rating { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; margin-top: 8px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 13px; }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+
+  /* PROTOCOL */
+  .tirz-protocol { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .protocol-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .protocol-row:last-child { border-bottom: none; }
+  .protocol-row .wk { color: var(--muted); }
+  .protocol-row .dose { font-family: 'DM Mono', monospace; color: var(--text); }
+  .protocol-row.current { background: rgba(126,232,162,0.06); margin: 0 -8px; padding: 8px; border-radius: 6px; }
+  .protocol-row.current .wk { color: var(--accent); font-weight: 600; }
+  .protocol-row.current .dose { color: var(--accent); }
+  .schedule-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .schedule-row:last-child { border-bottom: none; }
+  .sched-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .sched-info { flex: 1; }
+  .sched-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .sched-freq { font-size: 12px; color: var(--muted); }
+  .sched-next { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent2); }
+  .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; font-size: 14px; }
+  .checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .banner { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--danger); margin-bottom: 16px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">STACK / TRACKER</div>
+  <div class="week-badge" id="weekBadge">Week 1</div>
+</header>
+
+<nav>
+  <button class="tab active" onclick="showPage('dashboard')">Today</button>
+  <button class="tab" onclick="showPage('calc')">Calc</button>
+  <button class="tab" onclick="showPage('log')">Log</button>
+  <button class="tab" onclick="showPage('history')">History</button>
+  <button class="tab" onclick="showPage('schedule')">Protocol</button>
+</nav>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="page active">
+  <div class="next-card">
+    <div class="next-label">Next Injection</div>
+    <div class="next-peptide" id="nextPeptide">Tirzepatide</div>
+    <div class="next-detail">Dose: <span id="nextDose">2.5mg</span> · <span id="nextDate">Loading...</span></div>
+    <button class="log-btn" onclick="quickLog()">Log Injection →</button>
+  </div>
+
+  <div class="section-label">Stack Status</div>
+  <div class="peptide-grid">
+    <div class="peptide-card">
+      <div class="p-name">Tirzepatide</div>
+      <div class="p-dose" id="tirzDose">2.5mg / week</div>
+      <div class="p-status due" id="tirzStatus"><div class="dot"></div>Due today</div>
+    </div>
+    <div class="peptide-card glow-card">
+      <div class="p-name">GLOW Stack</div>
+      <div class="p-dose">1 vial / week</div>
+      <div class="p-status glow" id="glowStatus"><div class="dot"></div>On track</div>
+      <div class="glow-sublabel">GHK-Cu 50 · TB-500 10 · BPC-157 10</div>
+    </div>
+  </div>
+
+  <div class="section-label">This Week</div>
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="stat-val" id="totalInj">0</div>
+      <div class="stat-lbl">Injections</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="currentWeek">1</div>
+      <div class="stat-lbl">Week</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="streakDays">0</div>
+      <div class="stat-lbl">Day streak</div>
+    </div>
+  </div>
+</div>
+
+<!-- CALCULATOR -->
+<div id="calc" class="page">
+  <div class="banner">⚠️ For personal reference only. Verify all calculations with your prescriber or compounding pharmacy.</div>
+
+  <!-- Tirzepatide -->
+  <div class="calc-section">
+    <div class="calc-title">Tirzepatide <span class="pill tirz">GIP/GLP-1</span></div>
+    <div class="field-row">
+      <div class="field">
+        <label>Vial concentration (mg/mL)</label>
+        <input type="number" id="tirzConc" value="5" step="0.5" oninput="calcTirz()">
+      </div>
+      <div class="field">
+        <label>Target dose (mg)</label>
+        <input type="number" id="tirzTarget" value="2.5" step="0.5" oninput="calcTirz()">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Syringe size (units)</label>
+        <select id="tirzSyringe" onchange="calcTirz()">
+          <option value="100">100u (1mL)</option>
+          <option value="50">50u (0.5mL)</option>
+          <option value="30">30u (0.3mL)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>BAC water added (mL)</label>
+        <input type="number" id="tirzWater" value="2" step="0.5" oninput="calcTirz()">
+      </div>
+    </div>
+    <div class="calc-result" id="tirzResult"></div>
+  </div>
+
+  <!-- GLOW Stack -->
+  <div class="calc-section glow-section">
+    <div class="calc-title">GLOW Stack <span class="pill glow">GHK-Cu · TB-500 · BPC-157</span></div>
+    <div class="field-row">
+      <div class="field">
+        <label>BAC water added (mL)</label>
+        <input type="number" id="glowWater" value="2" step="0.5" oninput="calcGLOW()">
+      </div>
+      <div class="field">
+        <label>Frequency</label>
+        <select id="glowFreq" onchange="calcGLOW()">
+          <option value="1">Weekly</option>
+          <option value="2">2× per week</option>
+          <option value="3">3× per week</option>
+          <option value="4">4× per week</option>
+          <option value="5">5× per week</option>
+          <option value="6">6× per week</option>
+          <option value="7">Daily</option>
+          <option value="14">Twice daily</option>
+          <option value="21">3× daily</option>
+          <option value="28">Nightly</option>
+        </select>
+      </div>
+    </div>
+    <div class="calc-result" id="glowResult"></div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div id="log" class="page">
+  <div class="log-form">
+    <h3>Log an Injection</h3>
+    <div class="full-field">
+      <label>Injection</label>
+      <select id="logPeptide">
+        <option value="Tirzepatide">Tirzepatide</option>
+        <option value="GLOW Stack">GLOW Stack</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="logDate">
+      </div>
+      <div class="field">
+        <label>Time</label>
+        <input type="time" id="logTime">
+      </div>
+    </div>
+    <div class="full-field">
+      <label>Dose / volume administered</label>
+      <input type="text" id="logDose" placeholder="e.g. 2.5mg / 0.5mL">
+    </div>
+    <div class="full-field">
+      <label>Site</label>
+      <select id="logSite">
+        <option>Abdomen L</option>
+        <option>Abdomen R</option>
+        <option>Thigh L</option>
+        <option>Thigh R</option>
+        <option>Glute L</option>
+        <option>Glute R</option>
+        <option>Deltoid L</option>
+        <option>Deltoid R</option>
+      </select>
+    </div>
+    <div class="full-field">
+      <label>How are you feeling? (optional)</label>
+      <div class="rating-row">
+        <button class="rating-btn" onclick="setRating(1)">😞<br><span style="font-size:10px">Rough</span></button>
+        <button class="rating-btn" onclick="setRating(2)">😐<br><span style="font-size:10px">Okay</span></button>
+        <button class="rating-btn" onclick="setRating(3)">🙂<br><span style="font-size:10px">Good</span></button>
+        <button class="rating-btn" onclick="setRating(4)">😄<br><span style="font-size:10px">Great</span></button>
+      </div>
+    </div>
+    <div class="full-field">
+      <label>Notes (side effects, observations)</label>
+      <textarea id="logNotes" placeholder="e.g. mild nausea 2hr post-injection, resolved..."></textarea>
+    </div>
+    <button class="submit-btn" onclick="saveLog()">Save Log Entry</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div id="history" class="page">
+  <div id="historyList"></div>
+</div>
+
+<!-- PROTOCOL -->
+<div id="schedule" class="page">
+
+  <div class="section-label" style="margin-bottom:12px">Tirzepatide Titration</div>
+  <div class="tirz-protocol">
+    <div class="protocol-row current">
+      <span class="wk">Wks 1–4 ◀ YOU ARE HERE</span>
+      <span class="dose">2.5mg / wk</span>
+    </div>
+    <div class="protocol-row"><span class="wk">Wks 5–8</span><span class="dose">5mg / wk</span></div>
+    <div class="protocol-row"><span class="wk">Wks 9–12</span><span class="dose">7.5mg / wk</span></div>
+    <div class="protocol-row"><span class="wk">Wks 13–16</span><span class="dose">10mg / wk</span></div>
+    <div class="protocol-row"><span class="wk">Wks 17–20</span><span class="dose">12.5mg / wk</span></div>
+    <div class="protocol-row"><span class="wk">Wk 21+</span><span class="dose">15mg / wk (max)</span></div>
+  </div>
+
+  <div class="section-label" style="margin-bottom:12px">Weekly Schedule</div>
+  <div class="tirz-protocol">
+    <div class="schedule-row">
+      <div class="sched-dot" style="background:var(--accent3)"></div>
+      <div class="sched-info">
+        <div class="sched-name">Tirzepatide</div>
+        <div class="sched-freq">2.5mg · Weekly · SubQ</div>
+      </div>
+      <div class="sched-next">Weekly</div>
+    </div>
+    <div class="schedule-row">
+      <div class="sched-dot" style="background:var(--glow)"></div>
+      <div class="sched-info">
+        <div class="sched-name">GLOW Stack</div>
+        <div class="sched-freq">1 vial · Weekly · SubQ/IM · GHK-Cu 50mg / TB-500 10mg / BPC-157 10mg</div>
+      </div>
+      <div class="sched-next">Weekly</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-bottom:12px;margin-top:24px">Daily Checklist</div>
+  <div class="tirz-protocol">
+    <label class="checkbox-row"><input type="checkbox"> GLOW Stack logged (if injection day)</label>
+    <label class="checkbox-row"><input type="checkbox"> Tirzepatide logged (if injection day)</label>
+    <label class="checkbox-row"><input type="checkbox"> Hydration 3L+</label>
+    <label class="checkbox-row"><input type="checkbox"> Protein target hit</label>
+    <label class="checkbox-row"><input type="checkbox"> Log any side effects</label>
+  </div>
+
+</div>
+
+<script>
+let logs = JSON.parse(localStorage.getItem('peptide_logs') || '[]');
+let selectedRating = 0;
+let startDate = localStorage.getItem('startDate') || null;
+if (!startDate) { startDate = new Date().toISOString().split('T')[0]; localStorage.setItem('startDate', startDate); }
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'history') renderHistory();
+  if (id === 'calc') { calcTirz(); calcGLOW(); }
+}
+
+function updateDashboard() {
+  const start = new Date(startDate);
+  const now = new Date();
+  const dayDiff = Math.floor((now - start) / (1000*60*60*24));
+  const week = Math.floor(dayDiff / 7) + 1;
+  document.getElementById('currentWeek').textContent = week;
+  document.getElementById('weekBadge').textContent = `Week ${week}`;
+  document.getElementById('totalInj').textContent = logs.length;
+
+  let streak = 0;
+  let check = new Date(now.toISOString().split('T')[0]);
+  while (true) {
+    const ds = check.toISOString().split('T')[0];
+    if (logs.some(l => l.date === ds)) { streak++; check.setDate(check.getDate()-1); } else break;
+  }
+  document.getElementById('streakDays').textContent = streak;
+
+  const tirzLogs = logs.filter(l => l.peptide === 'Tirzepatide').sort((a,b) => new Date(b.date)-new Date(a.date));
+  if (tirzLogs.length) {
+    const next = new Date(tirzLogs[0].date);
+    next.setDate(next.getDate()+7);
+    const diff = Math.ceil((next - now) / (1000*60*60*24));
+    if (diff <= 0) {
+      document.getElementById('nextDate').textContent = 'Due today';
+      document.getElementById('tirzStatus').innerHTML = '<div class="dot"></div>Due today';
+      document.getElementById('tirzStatus').className = 'p-status due';
+    } else {
+      document.getElementById('nextDate').textContent = `In ${diff} day${diff>1?'s':''}`;
+      document.getElementById('tirzStatus').innerHTML = `<div class="dot"></div>In ${diff}d`;
+      document.getElementById('tirzStatus').className = 'p-status ok';
+    }
+  } else {
+    document.getElementById('nextDate').textContent = 'Due today (first dose)';
+  }
+
+  const glowLogs = logs.filter(l => l.peptide === 'GLOW Stack').sort((a,b) => new Date(b.date)-new Date(a.date));
+  if (glowLogs.length) {
+    const next = new Date(glowLogs[0].date);
+    next.setDate(next.getDate()+7);
+    const diff = Math.ceil((next - now) / (1000*60*60*24));
+    if (diff <= 0) {
+      document.getElementById('glowStatus').innerHTML = '<div class="dot"></div>Due today';
+      document.getElementById('glowStatus').className = 'p-status glow';
+    } else {
+      document.getElementById('glowStatus').innerHTML = `<div class="dot"></div>In ${diff}d`;
+      document.getElementById('glowStatus').className = 'p-status ok';
+    }
+  }
+}
+
+function quickLog() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===2));
+  document.getElementById('log').classList.add('active');
+  document.getElementById('logPeptide').value = 'Tirzepatide';
+  document.getElementById('logDose').value = '2.5mg / 0.5mL';
+  const now = new Date();
+  document.getElementById('logDate').value = now.toISOString().split('T')[0];
+  document.getElementById('logTime').value = now.toTimeString().slice(0,5);
+}
+
+function setRating(n) {
+  selectedRating = n;
+  document.querySelectorAll('.rating-btn').forEach((b,i) => b.classList.toggle('selected', i+1===n));
+}
+
+function saveLog() {
+  const entry = {
+    id: Date.now(),
+    peptide: document.getElementById('logPeptide').value,
+    date: document.getElementById('logDate').value,
+    time: document.getElementById('logTime').value,
+    dose: document.getElementById('logDose').value,
+    site: document.getElementById('logSite').value,
+    rating: selectedRating,
+    notes: document.getElementById('logNotes').value
+  };
+  logs.unshift(entry);
+  localStorage.setItem('peptide_logs', JSON.stringify(logs));
+  selectedRating = 0;
+  document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('logNotes').value = '';
+  document.getElementById('logDose').value = '';
+  updateDashboard();
+  alert('✓ Logged successfully');
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!logs.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">💉</div>No logs yet.<br>Start tracking your first injection.</div>'; return; }
+  const ratings = ['','😞','😐','🙂','😄'];
+  el.innerHTML = logs.map(l => `
+    <div class="log-entry">
+      <div class="entry-header">
+        <div class="entry-peptide">${l.peptide}</div>
+        <div class="entry-date">${l.date} ${l.time||''}</div>
+      </div>
+      <div class="entry-dose">${l.dose} · ${l.site}</div>
+      ${l.notes ? `<div class="entry-note">${l.notes}</div>` : ''}
+      ${l.rating ? `<div class="entry-rating">${ratings[l.rating]} Feeling ${['','rough','okay','good','great'][l.rating]}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function calcTirz() {
+  const conc = parseFloat(document.getElementById('tirzConc').value) || 5;
+  const target = parseFloat(document.getElementById('tirzTarget').value) || 2.5;
+  const water = parseFloat(document.getElementById('tirzWater').value) || 2;
+  const syringe = parseInt(document.getElementById('tirzSyringe').value) || 100;
+  const mLneeded = target / conc;
+  const units = Math.round(mLneeded * syringe);
+  const dosesPerVial = Math.floor((conc * water) / target);
+  document.getElementById('tirzResult').innerHTML = `
+    <div class="result-row"><span>Reconstituted conc</span><span>${conc} mg/mL</span></div>
+    <div class="result-row"><span>Volume to inject</span><span>${mLneeded.toFixed(3)} mL</span></div>
+    <div class="result-row result-highlight"><span>Units to draw</span><span>${units} units</span></div>
+    <div class="result-row"><span>Doses per vial</span><span>~${dosesPerVial} doses</span></div>
+    <div class="result-row"><span>Vial lasts</span><span>~${dosesPerVial} weeks</span></div>
+  `;
+}
+
+function calcGLOW() {
+  const water = parseFloat(document.getElementById('glowWater').value) || 2;
+  const freq = parseInt(document.getElementById('glowFreq').value) || 1;
+
+  const ghk = 50, tb = 10, bpc = 10;
+  const totalMg = ghk + tb + bpc;
+  const concMgMl = totalMg / water;
+  const mLperDose = water;
+  const units = Math.round(mLperDose * 100);
+
+  // freq values: 1-7 = doses/week, 14 = twice daily, 21 = 3x daily, 28 = nightly (once/night = daily)
+  let dosesPerWeek, freqLabel, vialsPerWeek, vialsPerMonth;
+  if (freq <= 7) {
+    dosesPerWeek = freq;
+    vialsPerWeek = freq;
+    vialsPerMonth = Math.round(freq * 4.3);
+    freqLabel = freq === 7 ? 'Daily' : `${freq}× per week`;
+  } else if (freq === 14) {
+    dosesPerWeek = 14;
+    vialsPerWeek = 14;
+    vialsPerMonth = Math.round(14 * 4.3);
+    freqLabel = 'Twice daily';
+  } else if (freq === 21) {
+    dosesPerWeek = 21;
+    vialsPerWeek = 21;
+    vialsPerMonth = Math.round(21 * 4.3);
+    freqLabel = '3× daily';
+  } else if (freq === 28) {
+    dosesPerWeek = 7;
+    vialsPerWeek = 7;
+    vialsPerMonth = Math.round(7 * 4.3);
+    freqLabel = 'Nightly';
+  }
+
+  document.getElementById('glowResult').innerHTML = `
+    <div class="result-row"><span>Total peptide content</span><span>${totalMg}mg / vial</span></div>
+    <div class="result-row"><span>Reconstituted conc</span><span>${concMgMl.toFixed(1)} mg/mL</span></div>
+    <div class="result-row result-highlight"><span>Units to draw (full vial)</span><span>${units} units</span></div>
+    <div class="result-row"><span>Volume to inject</span><span>${mLperDose.toFixed(1)} mL</span></div>
+    <div class="result-row"><span>Frequency</span><span>${freqLabel}</span></div>
+    <div class="result-row"><span>Vials / week</span><span>${vialsPerWeek}</span></div>
+    <div class="result-row"><span>Vials / month</span><span>~${vialsPerMonth}</span></div>
+    <div class="glow-breakdown">
+      <div class="glow-breakdown-label">CONTENTS PER VIAL</div>
+      <div class="result-row"><span>GHK-Cu</span><span>${ghk}mg</span></div>
+      <div class="result-row"><span>TB-500</span><span>${tb}mg</span></div>
+      <div class="result-row"><span>BPC-157</span><span>${bpc}mg</span></div>
+    </div>
+  `;
+}
+
+const now = new Date();
+document.getElementById('logDate').value = now.toISOString().split('T')[0];
+document.getElementById('logTime').value = now.toTimeString().slice(0,5);
+updateDashboard();
+calcTirz(); calcGLOW();
+</script>
+</body>
+</html>
